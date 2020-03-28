@@ -1,0 +1,68 @@
+# Build configuration and output directories
+!src/main/bin/
+.gradle
+.m2
+bin/
+build/
+target/
+
+# Eclipse/STS
+.apt_generated
+.classpath
+.factorypath
+.metadata
+.project
+.settings
+.springBeans
+
+# JetBrains
+*.iml
+*.ipr
+*.iws
+.idea
+atlassian-ide-plugin.xml
+out
+
+# NetBeans
+.nb-gradle/
+.nbattrs
+nbbuild/
+nbdist/
+nbproject/private/
+
+# VSCode
+.vscode
+
+# Packages, Archives, etc.
+#
+# It is better to unpack these files and commit the
+# raw source git has its own built in compression methods
+*.7z
+*.dmg
+*.iso
+*.rar
+*.tar
+*.zip
+
+# Compiled source
+*.class
+*.com
+*.dll
+*.exe
+*.o
+*.so
+
+# Logs and databases
+*.log
+
+# OS generated files
+.DS_Store*
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# Editor Files
+*~
+*.swp
+
+# Generated

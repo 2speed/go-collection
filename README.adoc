@@ -1,0 +1,208 @@
+= Collections in Go
+Matt Nicholls <transientvariable@gmail.com>
+:keywords: Golang, Abstract Data Types, Data Structures
+:sectanchors: true
+:source-highlighter: prettify
+:icons: font
+
+CAUTION: This is still very much a WIP and is not currently recommended for use in production.
+
+In my experience thus far with https://golang.org/[Golang] there has been a prevailing idiom of "the standard library has everything you need" a.k.a. batteries included, which has held up in most use cases. However, collections in Go lack a sizable chunk of functionality when compared to other popular (or _beloved_ 🦀) programming languages currently in use (refer to your favorite top language list). I suspect this is due large part by https://blog.golang.org/why-generics[Go's lack of generics], but that horse has already been savagely beaten. This is not to say that Go's standard collections are completely useless, there are some https://github.com/golang/go/wiki/SliceTricks[pretty nifty slice tricks] that I use on a regular basis. So instead of engaging in some long diatribe on a blog or forum, I've tried to address some of the gaps in Go's collection story here.
+
+== Usage
+
+=== Prerequisites
+
+- The link:https://git-scm.com/[Git] version management tool
+- The link:https://golang.org/dl/[Golang Runtime], version 1.13 or later
+
+=== Fetch the Source
+
+....
+$ go get -u github.com/2speed/go-collection
+....
+
+=== Example: Functional-style Collection Operations
+
+When consuming Windows event log data from a streaming data platform, a common task might be parsing and normalizing file hashes from each event to better serve downstream processes. The raw format of this data might be in JSON, and look something like this:
+
+.raw JSON event data
+[source,json]
+----
+{
+  "AccountName": "SYSTEM",
+  "AccountType": "User",
+  "DestinationHostname": "bad.host.com",
+  "DestinationIp": "...",
+  "DestinationIsIpv6": "false",
+  "DestinationPort": "53",
+  "EventReceivedTime": "...",
+  "EventTime": "...",
+  "EventType": "INFO",
+  "Hashes": "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "Hostname": "badactor",
+  "Image": "...",
+  "Opcode": "Info",
+  "Protocol": "udp",
+  "SourceHostname": "badactor.inside.your.network",
+  "SourceIp": "...",
+  "SourceIsIpv6": "false",
+  "SourceModuleName": "eventlog",
+  "SourceName": "Microsoft-Windows-Sysmon"
+}
+----
+
+Everything looks okay except that pesky `Hashes` field. What we really want is for the `Hashes` field to be a JSON object and not a string:
+
+[source,json]
+----
+{
+  ...
+
+  "Hashes": {
+    "md5": "37a6259cc0c1dae299a7866489dff0bd",
+    "sha1": "2be88ca4242c76e8253ac62474851065032d6833",
+    "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+  },
+
+  ...
+}
+----
+
+Depending on the programming language at your disposal, parsing the data into the required format is pretty straightforward (almost) using functional-style collection operations provided the language's standard library:
+
+.Python
+[source,python]
+----
+hashes = "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+file_hashes = {p[0]: p[1] for p in [s.split('=') for s in hashes.split(',')] if len(p) == 2}
+----
+
+.JS
+[source,javascript]
+----
+const hashes = "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b";
+const fileHashes =
+  hashes
+  .split(',')
+  .map(h => h.split('='))
+  .filter(h => h.length === 2)
+  .reduce((fh, h) => {
+    fh[h[0]] = h[1];
+    return fh;
+  }, {});
+----
+
+.Java
+[source,java]
+----
+import static java.util.stream.Arrays.stream;
+import static java.util.stream.Collectors.toMap;
+
+...
+
+final var hashes = "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b";
+final var fileHashes =
+        stream(hashes.split(","))
+            .map(h -> h.split("="))
+            .filter(h -> h.length == 2)
+            .collect(toMap(h -> h[0], h -> h[1]));
+----
+
+.Golang
+[source,golang]
+----
+package main
+
+import (
+    "strings"
+)
+
+func MapPairs(initial []string, f func(string) []string) [][]string {
+    mapped := make([][]string, len(initial))
+    for i, v := range initial {
+        mapped[i] = f(v)
+    }
+    return mapped
+}
+
+func FilterPairs(pairs [][]string, f func([]string) bool) [][]string {
+    filtered := make([][]string, 0)
+    for _, v := range pairs {
+        if f(v) {
+            filtered = append(filtered, v)
+        }
+    }
+    return filtered
+}
+
+func ReducePairs(pairs [][]string, f func(interface{}, []string), initial interface{}) interface{} {
+    for _, v := range pairs {
+        f(initial, v)
+    }
+    return initial
+}
+
+func main() {
+    hashes := "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+
+    hashPairs :=
+        MapPairs(strings.Split(hashes, ","), func(v string) []string {
+            return strings.Split(v, "=")
+        })
+
+    filteredPairs :=
+        FilterPairs(hashPairs, func(p []string) bool {
+            return len(p) == 2
+        })
+
+    fileHashes :=
+        ReducePairs(filteredPairs, func(acc interface{}, p []string) {
+            acc.(map[string]string)[p[0]] = p[1]
+        }, make(map[string]string))
+}
+----
+
+Hmmm, it would seem that Go implementation is a bit verbose. Let's see if we can shorten that up using `ArrayList`:
+
+.Golang (revised using `ArrayList`)
+[source,golang]
+----
+package main
+
+import (
+    "fmt"
+    "strings"
+
+    "github.com/2speed/go-collection/list"
+)
+
+func main() {
+    hashes := "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+
+    // Bit of boilerplate that will not be needed in future releases
+    h := strings.Split(hashes, ",")
+    sh := make([]interface{}, len(h))
+    for i := range strings.Split(hashes, ",") {
+        sh[i] = h[i]
+    }
+
+    fileHashes := make(map[string]interface{})
+    list.NewArrayListOf(sh).
+        Map(func(element interface{}) interface{} { // split each element into hash and value pairs
+            return strings.Split(element.(string), "=")
+        }).
+        Filter(func(element interface{}) bool { // ignore invalid hash and value pairs
+            return len(element.([]string)) == 2
+        }).
+        ForEach(func(element interface{}) { // add each hash and value pair to the map of file hashes
+            p := element.([]string)
+            fileHashes[p[0]] = p[1]
+        })
+}
+----
+
+Few points here:
+
+- Yes, there is quite of bit of type assertion here. I'll leave the investigation of alternative techniques like code generation as an exercise for the reader.
+- There is a bit of initial boilerplate here that I intend on resolving in a future release.
