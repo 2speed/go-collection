@@ -5,6 +5,12 @@ Matt Nicholls <transientvariable@gmail.com>
 :source-highlighter: prettify
 :icons: font
 
+ifdef::env-github[]
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
 CAUTION: This is still very much a WIP and is not currently recommended for use in production.
 
 In my experience thus far with https://golang.org/[Golang] there has been a prevailing idiom of "the standard library has everything you need" a.k.a. batteries included, which has held up in most use cases. However, collections in Go lack a sizable chunk of functionality when compared to other popular (or _beloved_ 🦀) programming languages currently in use (refer to your favorite top language list). I suspect this is due large part by https://blog.golang.org/why-generics[Go's lack of generics], but that horse has already been savagely beaten. This is not to say that Go's standard collections are completely useless, there are some https://github.com/golang/go/wiki/SliceTricks[pretty nifty slice tricks] that I use on a regular basis. So instead of engaging in some long diatribe on a blog or forum, I've tried to address some of the gaps in Go's collection story here.
@@ -57,15 +63,13 @@ Everything looks okay except that pesky `Hashes` field. What we really want is f
 [source,json]
 ----
 {
-  ...
 
   "Hashes": {
     "md5": "37a6259cc0c1dae299a7866489dff0bd",
     "sha1": "2be88ca4242c76e8253ac62474851065032d6833",
     "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
-  },
+  }
 
-  ...
 }
 ----
 
@@ -107,6 +111,27 @@ final var fileHashes =
             .map(h -> h.split("="))
             .filter(h -> h.length == 2)
             .collect(toMap(h -> h[0], h -> h[1]));
+
+...
+----
+
+.Rust
+[source,rust]
+----
+use std::collections::HashMap;
+
+...
+
+let hashes = "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b";
+
+let file_hashes =
+    hashes.split(',')
+        .map(|h| h.split('=').collect::<Vec<_>>())
+        .filter(|h| h.len() == 2)
+        .map(|h| (h[0], h[1]))
+        .collect::<HashMap<_, _>>();
+
+...
 ----
 
 .Golang
@@ -171,38 +196,63 @@ Hmmm, it would seem that Go implementation is a bit verbose. Let's see if we can
 package main
 
 import (
-    "fmt"
     "strings"
 
     "github.com/2speed/go-collection/list"
 )
 
 func main() {
-    hashes := "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
-
-    // Bit of boilerplate that will not be needed in future releases
-    h := strings.Split(hashes, ",")
-    sh := make([]interface{}, len(h))
-    for i := range strings.Split(hashes, ",") {
-        sh[i] = h[i]
-    }
-
+    hashes     := "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
     fileHashes := make(map[string]interface{})
-    list.NewArrayListOf(sh).
-        Map(func(element interface{}) interface{} { // split each element into hash and value pairs
-            return strings.Split(element.(string), "=")
+
+    list.NewArrayListOf(strings.Split(hashes, ",")).
+        Map(func(e interface{}) interface{} { // split each element into hash and value pairs
+            return strings.Split(e.(string), "=")
         }).
-        Filter(func(element interface{}) bool { // ignore invalid hash and value pairs
-            return len(element.([]string)) == 2
+        Filter(func(e interface{}) bool {     // ignore invalid hash and value pairs
+            return len(e.([]string)) == 2
         }).
-        ForEach(func(element interface{}) { // add each hash and value pair to the map of file hashes
-            p := element.([]string)
+        ForEach(func(e interface{}) {         // add each hash and value pair to the map of file hashes
+            p := e.([]string)
             fileHashes[p[0]] = p[1]
         })
 }
 ----
 
-Few points here:
+...variant with better readability:
 
-- Yes, there is quite of bit of type assertion here. I'll leave the investigation of alternative techniques like code generation as an exercise for the reader.
-- There is a bit of initial boilerplate here that I intend on resolving in a future release.
+[source,golang]
+----
+package main
+
+import (
+    "strings"
+
+    "github.com/2speed/go-collection/list"
+)
+
+func main() {
+    hashes     := "md5=37a6259cc0c1dae299a7866489dff0bd,sha1=2be88ca4242c76e8253ac62474851065032d6833,sha256=74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    fileHashes := make(map[string]interface{})
+
+    toPair := func(e interface{}) interface{} {
+        return strings.Split(e.(string), "=")
+    }
+
+    byLength := func(e interface{}) bool {
+        return len(e.([]string)) == 2
+    }
+
+    collectToMap := func(e interface{}) {
+        p := e.([]string)
+        fileHashes[p[0]] = p[1]
+    }
+
+    list.NewArrayListOf(strings.Split(hashes, ",")).
+        Map(toPair).           // split each element into hash and value pairs
+        Filter(byLength).      // ignore invalid hash and value pairs
+        ForEach(collectToMap)  // add each hash and value pair to the map of file hashes
+}
+----
+
+Yes, there is quite a bit of type assertion boilerplate here due to lack of generics. I'll leave the investigation of alternative techniques like code generation as an exercise for the reader.

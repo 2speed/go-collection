@@ -44,11 +44,21 @@ func NewArrayList() List {
 }
 
 // NewArrayListOf creates a new ArrayList containing the provided elements.
-func NewArrayListOf(elements []interface{}) List {
+func NewArrayListOf(elements interface{}) List {
     l := NewArrayList()
     if elements != nil {
-        for _, e := range elements {
-            _ = l.Add(e)
+        els := reflect.ValueOf(elements)
+
+        if els.Kind() == reflect.Interface {
+            els = els.Elem()
+        }
+
+        if els.Kind() == reflect.Slice {
+            for i := 0; i < els.Len(); i++ {
+                _ = l.Add(els.Index(i).Interface())
+            }
+        } else {
+            _ = l.Add(elements)
         }
     }
 

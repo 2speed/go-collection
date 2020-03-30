@@ -13,13 +13,13 @@ type element struct {
 }
 
 func TestArrayList_Add(t *testing.T) {
-    elements := []interface{}{
-        element{ value: "piranha plant", position: 0 },
-        element{ value: "samus",         position: 1 },
-        element{ value: "jigglypuff",    position: 2 },
-        element{ value: "r.o.b.",        position: 3 },
-        element{ value: "mega man",      position: 4 },
-        element{ value: "yoshi",         position: 5 },
+    elements := []element{
+        { value: "piranha plant", position: 0 },
+        { value: "samus",         position: 1 },
+        { value: "jigglypuff",    position: 2 },
+        { value: "r.o.b.",        position: 3 },
+        { value: "mega man",      position: 4 },
+        { value: "yoshi",         position: 5 },
     }
 
     t.Run("Add", func(t *testing.T) {
@@ -69,10 +69,10 @@ func TestArrayList_Add(t *testing.T) {
 
     t.Run("AddAll", func(t *testing.T) {
         list        := NewArrayListOf(elements)
-        newElements := []interface{}{
-            element{ value: "gumball", position: 6 },
-            element{ value: "luffy",   position: 7 },
-            element{ value: "chopper", position: 8 },
+        newElements := []element{
+            { value: "gumball", position: 6 },
+            { value: "luffy",   position: 7 },
+            { value: "chopper", position: 8 },
         }
         err := list.AddAll(NewArrayListOf(newElements))
 
@@ -80,27 +80,24 @@ func TestArrayList_Add(t *testing.T) {
         assertSize(t, list, 9)
 
         assertContains(t, list, newElements[0], true)
-        e, _ := newElements[0].(element)
-        assertIndex(t, list, newElements[0], e.position)
+        assertIndex(t, list, newElements[0], newElements[0].position)
 
         assertContains(t, list, newElements[1], true)
-        e, _ = newElements[1].(element)
-        assertIndex(t, list, newElements[1], e.position)
+        assertIndex(t, list, newElements[1], newElements[1].position)
 
         assertContains(t, list, newElements[2], true)
-        e, _ = newElements[2].(element)
-        assertIndex(t, list, newElements[2], e.position)
+        assertIndex(t, list, newElements[2], newElements[2].position)
     })
 }
 
 func TestArrayList_Remove(t *testing.T) {
-    elements := []interface{}{
-        element{ value: "piranha plant", position: 0 },
-        element{ value: "samus",         position: 1 },
-        element{ value: "jigglypuff",    position: 2 },
-        element{ value: "r.o.b.",        position: 3 },
-        element{ value: "mega man",      position: 4 },
-        element{ value: "yoshi",         position: 5 },
+    elements := []element{
+        { value: "piranha plant", position: 0 },
+        { value: "samus",         position: 1 },
+        { value: "jigglypuff",    position: 2 },
+        { value: "r.o.b.",        position: 3 },
+        { value: "mega man",      position: 4 },
+        { value: "yoshi",         position: 5 },
     }
 
     t.Run("Remove", func(t *testing.T) {
